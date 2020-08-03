@@ -1,0 +1,84 @@
+#+TITLE: JIRA REST API: Export all worklog records
+#+OPTIONS: ^:nil
+#+PROPERTY: header-args:sh :session *shell jira-rest-api-export-all-worklog-records sh* :results silent raw
+#+PROPERTY: header-args:python :session *shell jira-rest-api-export-all-worklog-records python* :results silent raw
+
+** System environment
+
+- Python 3.7.0
+
+- JIRA 7.6.1
+
+Python modules:
+
+- requests==2.21.0
+
+** Imports
+
+#+BEGIN_SRC python :tangle src/export_worklog.py
+import datetime
+import json
+import requests
+#+END_SRC
+
+** Params
+
+#+BEGIN_SRC python :tangle src/export_worklog.py
+URL = "https://jira.example.com"
+USER = "admin"
+PASSWORD = "password"
+#+END_SRC
+
+** Auth
+
+#+BEGIN_SRC python :tangle src/export_worklog.py
+AUTH = requests.auth.HTTPBasicAuth(USER, PASSWORD)
+#+END_SRC
+
+** Get ids
+
+#+BEGIN_SRC python :tangle src/export_worklog.py
+def get_ids(data):
+    return [x["worklogId"] for x in data["values"]]
+#+END_SRC
+
+** Get worklog records
+
+#+BEGIN_SRC python :tangle src/export_worklog.py
+def get_worklog_records(ids):
+    url = "%s/rest/api/2/worklog/list" % URL
+    data = {"ids": ids}
+    headers = {"content-type": "application/json"}
+    r = requests.post(url, json=data, headers=headers, auth=AUTH)
+    return r.json()
+#+END_SRC
+
+** Get worklog batch
+
+Only first 1000 records will be returned.
+
+#+BEGIN_SRC python :tangle src/export_worklog.py
+res = []
+url = "%s/rest/api/2/worklog/updated?since=0" % URL
+while url:
+    r = requests.get(url, auth=AUTH)
+    data = r.json()
+    url = data.get("nextPage")
+    ids = get_ids(data)
+    res.extend(get_worklog_records(ids))
+#+END_SRC
+
+** Save worklog JSON recrords
+
+#+BEGIN_SRC python :tangle src/export_worklog.py
+fn = "data/worklog.json"
+f = open(fn, "wt")
+f.write(json.dumps(res, indent=2))
+f.close()
+#+END_SRC
+
+** References
+
+- https://developer.atlassian.com/server/jira/platform/rest-apis/
+
+- https://docs.atlassian.com/software/jira/docs/api/REST/7.6.1/
